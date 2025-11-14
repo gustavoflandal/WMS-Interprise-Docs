@@ -1,0 +1,69 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Docker containers
+  - job_name: docker
+    docker:
+      host: unix:///var/run/docker.sock
+      labels:
+        container_name: ''
+        image_name: ''
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        target_label: 'container'
+      - source_labels: ['__meta_docker_image_name']
+        target_label: 'image'
+      - source_labels: ['__meta_docker_container_log_stream']
+        target_label: 'stream'
+
+  # System logs (Linux only)
+  - job_name: syslog
+    syslog:
+      listen_address: 127.0.0.1:514
+      idle_timeout: 60s
+      label_structured_data: yes
+    relabel_configs:
+      - source_labels: ['__syslog_message_hostname']
+        target_label: 'hostname'
+      - source_labels: ['__syslog_message_app_name']
+        target_label: 'app'
+
+  # Journal (systemd logs)
+  - job_name: journal
+    journal:
+      path: /var/log/journal
+      matches: _SYSTEMD_UNIT=docker.service
+    relabel_configs:
+      - source_labels: ['__journal__systemd_unit']
+        target_label: 'unit'
+      - source_labels: ['__journal_priority_keyword']
+        target_label: 'level'
+
+  # Application logs from filesystem
+  - job_name: application-logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: application
+          __path__: /var/log/app/*.log
+    pipeline_stages:
+      - multiline:
+          line_start_pattern: '^\d{4}-\d{2}-\d{2}'
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            message: msg
+            logger: logger
+      - labels:
+          level:
+          logger:

@@ -1,0 +1,15 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "WMS Dev PostgreSQL",
+      "Group": "Development",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "postgres",
+      "Username": "wms_user",
+      "Password": "wms_password_dev",
+      "SSLMode": "disable",
+      "Comment": "PostgreSQL server for WMS Enterprise development"
+    }
+  }
+}

@@ -1,0 +1,464 @@
+version: '3.9'
+
+# ============================================================================
+# WMS Enterprise - Docker Compose Dev Environment
+# ============================================================================
+#
+# Este arquivo configura a infraestrutura completa para desenvolvimento do
+# WMS Enterprise, incluindo:
+# - PostgreSQL (OLTP Database)
+# - Redis (Cache & Sessions)
+# - Elasticsearch (Search & Analytics)
+# - Apache Kafka (Event Streaming)
+# - Prometheus (Metrics)
+# - Grafana (Monitoring & Dashboards)
+# - pgAdmin (PostgreSQL GUI)
+# - Redis Commander (Redis GUI)
+# - Jaeger (Distributed Tracing)
+#
+# Uso:
+#   docker-compose up -d        # Iniciar todos os serviços
+#   docker-compose down         # Parar todos os serviços
+#   docker-compose logs -f      # Ver logs
+#   docker-compose ps           # Status dos containers
+# ============================================================================
+
+services:
+  # =========================================================================
+  # BANCO DE DADOS - PostgreSQL 15 (OLTP Principal)
+  # =========================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: wms-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-wms_dev}
+      POSTGRES_USER: ${DB_USER:-wms_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-wms_password_dev}
+      POSTGRES_INITDB_ARGS: "-c max_connections=200 -c shared_buffers=256MB"
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init-scripts:/docker-entrypoint-initdb.d:ro
+    networks:
+      - wms-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-wms_user} -d ${DB_NAME:-wms_dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    # Limites de recursos
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # =========================================================================
+  # CACHE - Redis 7 (Cluster Mode - Single Node para Dev)
+  # =========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: wms-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - wms-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # =========================================================================
+  # SEARCH ENGINE - Elasticsearch 8.5 (Full-text Search & Logs)
+  # =========================================================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: wms-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.watcher.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - wms-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\\\"status\\\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # =========================================================================
+  # MESSAGE BROKER - Apache Kafka (Event Streaming)
+  # =========================================================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: wms-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_INIT_LIMIT: 5
+    ports:
+      - "2181:2181"
+    networks:
+      - wms-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: wms-kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+      "KAFKA_LOG4J_LOGGERS": "kafka.controller=INFO,kafka.producer.async.DefaultEventHandler=INFO,state.change.logger=INFO"
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - wms-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions.sh", "--bootstrap-server", "localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # =========================================================================
+  # MONITORING - Prometheus (Metrics Collection)
+  # =========================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: wms-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - wms-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+
+  # =========================================================================
+  # VISUALIZATION - Grafana (Dashboards & Alerts)
+  # =========================================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: wms-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - wms-network
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # =========================================================================
+  # TRACING - Jaeger (Distributed Tracing)
+  # =========================================================================
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: wms-jaeger
+    restart: unless-stopped
+    ports:
+      - "6831:6831/udp"  # Jaeger agent
+      - "6832:6832/udp"  # Jaeger agent
+      - "16686:16686"     # Jaeger UI
+    environment:
+      COLLECTOR_ZIPKIN_HTTP_PORT: 9411
+    networks:
+      - wms-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:16686"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+
+  # =========================================================================
+  # DATABASE GUI - pgAdmin 4 (PostgreSQL Management)
+  # =========================================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: wms-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@wms.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      SCRIPT_NAME: /pgadmin
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
+    networks:
+      - wms-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/pgadmin"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # =========================================================================
+  # CACHE GUI - Redis Commander (Redis Management)
+  # =========================================================================
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: wms-redis-commander
+    restart: unless-stopped
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    networks:
+      - wms-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+
+  # =========================================================================
+  # KAFKA UI - Kafka Manager (Kafka Monitoring)
+  # =========================================================================
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: wms-kafka-ui
+    restart: unless-stopped
+    environment:
+      KAFKA_CLUSTERS_0_NAME: wms-kafka
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    ports:
+      - "8080:8080"
+    networks:
+      - wms-network
+    depends_on:
+      kafka:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # =========================================================================
+  # LOGGING - Loki (Log Aggregation)
+  # =========================================================================
+  loki:
+    image: grafana/loki:latest
+    container_name: wms-loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./docker/loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - wms-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3100/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # =========================================================================
+  # LOG COLLECTOR - Promtail (Log Shipper)
+  # =========================================================================
+  promtail:
+    image: grafana/promtail:latest
+    container_name: wms-promtail
+    restart: unless-stopped
+    volumes:
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./docker/promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - wms-network
+    depends_on:
+      - loki
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+
+# ============================================================================
+# VOLUMES - Persistent Storage
+# ============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  kafka_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  loki_data:
+    driver: local
+
+# ============================================================================
+# NETWORKS - Service Communication
+# ============================================================================
+networks:
+  wms-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+
+# ============================================================================
+# INFORMAÇÕES DE ACESSO AO AMBIENTE DE DESENVOLVIMENTO
+# ============================================================================
+#
+# DATABASE:
+#   - PostgreSQL: localhost:5432 (wms_user / wms_password_dev)
+#   - pgAdmin: http://localhost:5050 (admin@wms.local / admin)
+#
+# CACHE:
+#   - Redis: localhost:6379
+#   - Redis Commander: http://localhost:8081
+#
+# SEARCH:
+#   - Elasticsearch: http://localhost:9200
+#
+# MESSAGE BROKER:
+#   - Kafka: localhost:9092 (producers/consumers)
+#   - Kafka UI: http://localhost:8080
+#
+# MONITORING:
+#   - Prometheus: http://localhost:9090
+#   - Grafana: http://localhost:3000 (admin / admin)
+#   - Loki: http://localhost:3100
+#
+# TRACING:
+#   - Jaeger UI: http://localhost:16686
+#
+# ============================================================================
