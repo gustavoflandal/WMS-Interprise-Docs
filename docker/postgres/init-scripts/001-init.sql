@@ -8,7 +8,6 @@
 -- Habilitar extensões necessárias
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-CREATE EXTENSION IF NOT EXISTS "json";
 CREATE EXTENSION IF NOT EXISTS "hstore";
 
 -- ============================================================================
@@ -200,9 +199,7 @@ CREATE TABLE IF NOT EXISTS wms.inventory_transactions (
     reason TEXT,
     reference_id UUID,
     user_id UUID REFERENCES wms.users(id),
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_inventory_type (inventory_id, transaction_type),
-    INDEX idx_created (created_at DESC)
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ============================================================================
@@ -399,9 +396,7 @@ CREATE TABLE IF NOT EXISTS wms.audit_log (
     new_values JSONB,
     ip_address INET,
     user_agent TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_entity (entity_type, entity_id),
-    INDEX idx_created (created_at DESC)
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ============================================================================
@@ -430,6 +425,10 @@ CREATE INDEX IF NOT EXISTS idx_inventory_location ON wms.inventory_master(locati
 CREATE INDEX IF NOT EXISTS idx_inventory_tenant ON wms.inventory_master(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_inventory_batch ON wms.inventory_master(batch_id);
 
+-- Inventory Transactions
+CREATE INDEX IF NOT EXISTS idx_inventory_trans_inventory ON wms.inventory_transactions(inventory_id, transaction_type);
+CREATE INDEX IF NOT EXISTS idx_inventory_trans_created ON wms.inventory_transactions(created_at DESC);
+
 -- Orders
 CREATE INDEX IF NOT EXISTS idx_orders_tenant ON wms.orders(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_orders_warehouse ON wms.orders(warehouse_id);
@@ -454,6 +453,10 @@ CREATE INDEX IF NOT EXISTS idx_shipments_status ON wms.shipments(status);
 -- Returns
 CREATE INDEX IF NOT EXISTS idx_returns_tenant ON wms.returns(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_returns_status ON wms.returns(status);
+
+-- Audit Log
+CREATE INDEX IF NOT EXISTS idx_audit_entity ON wms.audit_log(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_audit_created ON wms.audit_log(created_at DESC);
 
 -- ============================================================================
 -- INSERIR DADOS INICIAIS
