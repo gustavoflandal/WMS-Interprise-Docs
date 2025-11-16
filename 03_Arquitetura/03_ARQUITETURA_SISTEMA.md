@@ -481,20 +481,20 @@ audit.* events
 
 | Camada             | Componente       | Tecnologia                 | Alternativa         |
 |--------------------|------------------|----------------------------|---------------------|
-| **Backend**        | Core             | Go / Rust                  | Python + FastAPI    |
-|                    | API Gateway      | Kong / AWS API Gateway     | NGINX + OpenResty   |
-|                    | Message Broker   | Kafka                      | RabbitMQ / AWS SQS  |
-| **Banco de Dados** | OLTP             | PostgreSQL                 | MySQL 8+            |
+| **Backend**        | Core             | .NET 10 / C# 13            | ASP.NET Core 10     |
+|                    | API Gateway      | Kong / Ocelot              | AWS API Gateway     |
+|                    | Message Broker   | Kafka / MassTransit        | RabbitMQ / Azure Service Bus |
+| **Banco de Dados** | OLTP             | PostgreSQL                 | SQL Server          |
 |                    | Cache            | Redis Cluster              | Memcached           |
 |                    | Search           | Elasticsearch              | OpenSearch          |
 |                    | Time Series      | InfluxDB                   | Prometheus          |
-| **Frontend** | Web | React.js         | Vue.js 3                   |                     |
-|                    | Mobile           | React Native               | Flutter             |
-|                    | UI Components    | Material-UI                | Ant Design          |
+| **Frontend**       | Web              | React.js / Blazor WASM     | Vue.js 3            |
+|                    | Mobile           | .NET MAUI / React Native   | Flutter             |
+|                    | UI Components    | Material-UI / MudBlazor    | Ant Design          |
 | **Infrastructure** | Orquestração     | Kubernetes                 | Docker Swarm        |
-|                    | Logs             | ELK Stack                  | Grafana Loki        |
-|                    | Monitoring       | Prometheus + Grafana       | New Relic           |
-|                    | CI/CD            | GitLab CI / GitHub Actions | Jenkins             |
+|                    | Logs             | Serilog + Seq / Loki       | ELK Stack           |
+|                    | Monitoring       | App Insights / Prometheus  | Grafana / New Relic |
+|                    | CI/CD            | Azure DevOps / GitHub Actions | GitLab CI        |
 |--------------------|------------------|----------------------------|---------------------|
 ---
 

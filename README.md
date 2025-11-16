@@ -221,14 +221,14 @@ Workspace_WMS/
 ## 🔧 Stack Tecnológico (Recomendado)
 
 ### Backend
-- **Linguagem:** Go ou Rust
-- **Framework:** Gin/Actix-web
-- **API Gateway:** Kong ou AWS API Gateway
+- **Linguagem:** C# 13 / .NET 10
+- **Framework:** ASP.NET Core 10
+- **API Gateway:** Kong, AWS API Gateway ou Ocelot
 
 ### Frontend
-- **Web:** React.js 18+
-- **Mobile:** React Native
-- **UI:** Material-UI ou Ant Design
+- **Web:** React.js 18+ ou Blazor WebAssembly
+- **Mobile:** React Native ou .NET MAUI
+- **UI:** Material-UI, Ant Design ou MudBlazor
 
 ### Database
 - **OLTP:** PostgreSQL 14+
@@ -238,9 +238,9 @@ Workspace_WMS/
 
 ### Infrastructure
 - **Orquestração:** Kubernetes
-- **Message Broker:** Apache Kafka ou AWS SQS
-- **Observabilidade:** Prometheus + Grafana
-- **Logging:** ELK Stack ou Grafana Loki
+- **Message Broker:** Apache Kafka, RabbitMQ ou Azure Service Bus
+- **Observabilidade:** Prometheus + Grafana ou Application Insights
+- **Logging:** ELK Stack, Grafana Loki ou Serilog + Seq
 
 ---
 

@@ -140,16 +140,20 @@ node --version    # v20.0.0+
 npm --version     # 9.0.0+
 ```
 
-**3.5 Go (Backend)**
+**3.5 .NET 10 SDK (Backend)**
 ```bash
 # Via Chocolatey
-choco install golang
+choco install dotnet-sdk
 
 # Ou download manual
-# https://go.dev/dl/ (go1.21.0+)
+# https://dotnet.microsoft.com/download/dotnet/10.0
 
 # Validar
-go version    # go version go1.21+
+dotnet --version    # 10.0.x
+dotnet --list-sdks  # Listar SDKs instalados
+
+# Verificar runtimes instalados
+dotnet --list-runtimes
 ```
 
 **3.6 PostgreSQL**
@@ -241,12 +245,17 @@ node --version    # v20.0.0+
 npm --version     # 9.0.0+
 ```
 
-**3.5 Go**
+**3.5 .NET 10 SDK**
 ```bash
-brew install go
+brew install --cask dotnet-sdk
+
+# Ou via download direto
+# https://dotnet.microsoft.com/download/dotnet/10.0
 
 # Validar
-go version    # go version go1.21+
+dotnet --version    # 10.0.x
+dotnet --list-sdks
+dotnet --list-runtimes
 ```
 
 **3.6 PostgreSQL**
@@ -336,17 +345,20 @@ node --version
 npm --version
 ```
 
-**3.5 Go**
+**3.5 .NET 10 SDK**
 ```bash
-wget https://go.dev/dl/go1.21.0.linux-amd64.tar.gz
-sudo tar -C /usr/local -xzf go1.21.0.linux-amd64.tar.gz
+# Ubuntu 22.04 / 24.04
+wget https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb -O packages-microsoft-prod.deb
+sudo dpkg -i packages-microsoft-prod.deb
+rm packages-microsoft-prod.deb
 
-# Adicionar ao PATH
-echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
-source ~/.bashrc
+sudo apt-get update
+sudo apt-get install -y dotnet-sdk-10.0
 
 # Validar
-go version
+dotnet --version    # 10.0.x
+dotnet --list-sdks
+dotnet --info       # Informações completas do ambiente
 ```
 
 **3.6 PostgreSQL**
@@ -392,19 +404,41 @@ sudo snap install code --classic
 
 ### IDEs Recomendadas
 
-#### Backend (Go)
+#### Backend (.NET)
 
-**Opção 1: Visual Studio Code (Recomendado)**
+**Opção 1: Visual Studio 2022 (v17.12+) Community (Recomendado para Windows)**
+```
+Download: https://visualstudio.microsoft.com/vs/community/
+Recursos: IntelliSense avançado, debugging robusto, refactoring, AI assistance
+Workloads necessários:
+  - ASP.NET and web development
+  - .NET desktop development
+  - Azure development (opcional)
+  - Container development tools
+
+Importante: Versão 17.12+ necessária para suporte completo ao .NET 10
+```
+
+**Opção 2: JetBrains Rider 2024.3+**
+```
+Download: https://www.jetbrains.com/rider/
+Licença: Paid (com desconto educacional/trial 30 dias)
+Cross-platform: Windows, macOS, Linux
+Recursos:
+  - Suporte completo ao .NET 10 e C# 13
+  - Debugging avançado
+  - Refactoring inteligente
+  - Profiling integrado
+```
+
+**Opção 3: Visual Studio Code**
 ```
 Download: https://code.visualstudio.com/
-Extensão: golang.go (Go for Visual Studio Code)
-Extensão: ms-vscode.makefile-tools
-```
-
-**Opção 2: JetBrains GoLand**
-```
-Download: https://www.jetbrains.com/go/
-Licença: Paid (com desconto educacional)
+Extensões essenciais:
+  - C# Dev Kit (Microsoft)
+  - C# (Microsoft)
+  - NuGet Package Manager
+  - .NET Core Test Explorer
 ```
 
 #### Frontend (React/TypeScript)
@@ -438,16 +472,25 @@ sudo apt install build-essential -y
 make --version
 ```
 
-**Go Tools**
+**.NET Tools**
 ```bash
-# Debugger (dlv)
-go install github.com/go-delve/delve/cmd/dlv@latest
+# Entity Framework Core Tools (para migrations)
+dotnet tool install --global dotnet-ef
 
-# Database Migrations
-go install -tags 'postgres' github.com/migrate/migrate/v4/cmd/migrate@latest
+# Code formatter
+dotnet tool install --global dotnet-format
 
-# Go Linter
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+# Code analyzer
+dotnet tool install --global dotnet-outdated-tool
+
+# OpenAPI/Swagger Tools
+dotnet tool install --global Swashbuckle.AspNetCore.Cli
+
+# Database Migrations (Alternativa ao EF - FluentMigrator)
+dotnet tool install --global FluentMigrator.DotNet.Cli
+
+# Validar instalação
+dotnet tool list --global
 ```
 
 ---
@@ -842,39 +885,49 @@ npm install
 
 ### Backend
 
-**Arquivo `backend/cmd/api/main.go`:**
+**Arquivo `backend/Program.cs`:**
 
-```go
-package main
+```csharp
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
-import (
-	"encoding/json"
-	"log"
-	"net/http"
-)
+var builder = WebApplication.CreateBuilder(args);
 
-func main() {
-	http.HandleFunc("/api/v1/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{
-			"status":  "ok",
-			"service": "wms-api",
-		})
-	})
+// Add services to the container
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
-	log.Println("Server listening on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+var app = builder.Build();
+
+// Configure the HTTP request pipeline
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
+
+app.MapGet("/api/v1/health", () => Results.Ok(new
+{
+    status = "ok",
+    service = "wms-api",
+    timestamp = DateTime.UtcNow
+}))
+.WithName("Health")
+.WithOpenApi();
+
+app.Run("http://localhost:8080");
 ```
 
 **Executar:**
 ```bash
 cd backend
-go run ./cmd/api/main.go
+dotnet run
 
 # Testar
 curl http://localhost:8080/api/v1/health
-# {"status":"ok","service":"wms-api"}
+# {"status":"ok","service":"wms-api","timestamp":"2025-01-16T10:30:00Z"}
 ```
 
 ### Frontend

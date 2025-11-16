@@ -149,7 +149,7 @@ O WMS Enterprise é um sistema de gerenciamento de armazém de última geração
 
 ## 6. Premissas
 
-1. **Tecnologia:** Utilização de stack moderno (Golang/Rust backend, React/Vue frontend)
+1. **Tecnologia:** Utilização de stack moderno (.NET 10/C# 13 backend, React/Vue/Blazor frontend)
 2. **Infraestrutura:** Cloud-native com Kubernetes
 3. **Equipe:** Disponibilidade de times multidisciplinares
 4. **Orçamento:** Aprovado e alocado para 3 anos

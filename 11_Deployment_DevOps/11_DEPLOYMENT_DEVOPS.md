@@ -53,43 +53,102 @@
 
 ## 2. Containerização
 
-### 2.1 Dockerfile (Multi-stage)
+### 2.1 Dockerfile (Multi-stage - .NET 10)
 
 ```dockerfile
 # Stage 1: Build
-FROM golang:1.22-alpine AS builder
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
 
-WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
+# Copy csproj and restore as distinct layers (aproveitando cache do Docker)
+COPY ["src/WMS.API/WMS.API.csproj", "src/WMS.API/"]
+COPY ["src/WMS.Application/WMS.Application.csproj", "src/WMS.Application/"]
+COPY ["src/WMS.Domain/WMS.Domain.csproj", "src/WMS.Domain/"]
+COPY ["src/WMS.Infrastructure/WMS.Infrastructure.csproj", "src/WMS.Infrastructure/"]
+COPY ["src/WMS.Shared/WMS.Shared.csproj", "src/WMS.Shared/"]
 
+RUN dotnet restore "src/WMS.API/WMS.API.csproj"
+
+# Copy everything else and build
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-    -ldflags="-w -s" \
-    -o /app/wms-server \
-    ./cmd/server/main.go
+WORKDIR "/src/src/WMS.API"
+RUN dotnet build "WMS.API.csproj" -c Release -o /app/build
 
-# Stage 2: Runtime (Minimal)
-FROM alpine:3.19
+# Stage 2: Publish
+FROM build AS publish
+RUN dotnet publish "WMS.API.csproj" -c Release -o /app/publish \
+    /p:UseAppHost=false \
+    /p:PublishTrimmed=false \
+    /p:PublishReadyToRun=true
 
-RUN apk add --no-cache ca-certificates tzdata
-
+# Stage 3: Runtime (Minimal - usando ASP.NET Core Runtime)
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
 
-# Copy apenas binário do stage anterior
-COPY --from=builder /app/wms-server .
+# Install curl for health checks
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Copy published app
+COPY --from=publish /app/publish .
 
 # Non-root user por segurança
-RUN addgroup -g 1000 appuser && \
-    adduser -D -u 1000 -G appuser appuser
+RUN addgroup --gid 1000 appuser && \
+    adduser --uid 1000 --gid 1000 --disabled-password --gecos "" appuser && \
+    chown -R appuser:appuser /app
 
 USER appuser
 
 EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD ["/app/wms-server", "health"]
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
-ENTRYPOINT ["/app/wms-server"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:8080/health || exit 1
+
+ENTRYPOINT ["dotnet", "WMS.API.dll"]
+```
+
+### 2.1.1 Dockerfile com Native AOT (Opcional - Máxima Performance)
+
+Para cenários que exigem startup ultrarrápido e menor footprint de memória:
+
+```dockerfile
+# Build com Native AOT
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+COPY ["src/WMS.API/WMS.API.csproj", "src/WMS.API/"]
+RUN dotnet restore "src/WMS.API/WMS.API.csproj"
+
+COPY . .
+WORKDIR "/src/src/WMS.API"
+RUN dotnet publish "WMS.API.csproj" -c Release -o /app/publish \
+    /p:PublishAot=true \
+    /p:PublishTrimmed=true \
+    /p:PublishSingleFile=true
+
+# Runtime ultra-mínimo (distroless)
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-alpine AS final
+WORKDIR /app
+COPY --from=build /app/publish .
+
+RUN addgroup -g 1000 appuser && \
+    adduser -D -u 1000 -G appuser appuser && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
+EXPOSE 8080
+ENV ASPNETCORE_URLS=http://+:8080
+
+ENTRYPOINT ["./WMS.API"]
+```
+
+**Vantagens do Native AOT:**
+- Startup time: ~10ms (vs ~200ms runtime normal)
+- Memory footprint: ~15MB (vs ~40MB runtime normal)
+- Imagem Docker: ~40MB (vs ~100MB runtime normal)
 ```
 
 ### 2.2 Docker Compose (Local Development)

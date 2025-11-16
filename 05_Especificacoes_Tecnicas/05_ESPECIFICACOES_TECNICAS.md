@@ -4,38 +4,44 @@
 
 ### 1.1 Backend
 
-#### Opção Recomendada: Go (Golang)
+#### Opção Recomendada: .NET 10 (C# 13)
 
 **Justificativa:**
-- Concorrência nativa com goroutines
-- Performance: 20-50x mais rápido que Python
-- Compilação estática (deploy simplificado)
-- Melhor para I/O intensivo (típico de WMS)
-- Ecossistema maduro para sistemas distribuídos
+- Performance de última geração com compilação Native AOT otimizada
+- Ecossistema maduro e enterprise-ready
+- Async/await e Task-based async pattern altamente otimizados
+- Tooling robusto com Visual Studio 2022 e JetBrains Rider
+- Forte tipagem com melhorias em nullable reference types e pattern matching
+- Suporte LTS (Long-Term Support) com atualizações até 2027
+- Melhorias significativas em performance e memory footprint
+- Record types e init-only properties para imutabilidade
+- File-scoped namespaces e global usings para código mais limpo
+- Ecossistema rico para cloud-native e sistemas distribuídos
 
 **Stack Principal:**
 ```
-Language: Go 1.22+
-Framework: Echo / Gin (HTTP)
-Event Bus: Kafka + Shopify/sarama (Golang client)
-ORM: SQLC (type-safe) + pgx (driver)
-Logging: Structured Logging (slog + loki)
-Testing: Testify + Table-driven tests
-Build: Make + Docker
+Language: C# 13 / .NET 10
+Framework: ASP.NET Core 10 (Minimal APIs ou Controllers)
+Event Bus: MassTransit 8.x + Kafka/RabbitMQ
+ORM: Entity Framework Core 10 / Dapper 2.x (para queries de alta performance)
+Logging: Serilog 4.x + Seq/Loki/OpenTelemetry
+Testing: xUnit 2.x / NUnit 4.x + FluentAssertions 7.x
+Build: MSBuild / dotnet CLI + Docker
+Serialization: System.Text.Json (built-in, high performance)
 ```
 
-#### Alternativa: Rust
+#### Alternativa: Node.js (TypeScript)
 
 **Justificativa:**
-- Performance máxima (native speed)
-- Memory safety sem garbage collector
-- Ideal para serviços críticos
+- Mesma linguagem no frontend e backend
+- Excelente para I/O assíncrono
+- Ecossistema npm muito rico
 
 **Stack:**
 ```
-Framework: Actix-web / Axum
-Database: sqlx (async)
-ORM: Diesel / SeaORM
+Framework: NestJS / Fastify
+Database: Prisma ORM / TypeORM
+Testing: Jest + Supertest
 ```
 
 ### 1.2 Frontend
@@ -80,155 +86,281 @@ APM: Jaeger / DataDog
 
 ## 2. Padrões de Código e Arquitetura
 
-### 2.1 Project Structure (Go)
+### 2.1 Project Structure (.NET 10)
 
 ```
 wms-backend/
-├── cmd/
-│   ├── server/
-│   │   └── main.go              # Entry point
-│   └── migration/
-│       └── main.go              # Database migrations
-├── internal/
-│   ├── config/                  # Configuração
-│   ├── domain/                  # Lógica de negócio
-│   │   ├── models.go
-│   │   ├── repositories.go      # Interfaces
-│   │   └── services.go          # Interfaces
-│   ├── application/             # Use cases
-│   │   ├── inbound/
-│   │   ├── picking/
-│   │   ├── shipping/
-│   │   └── ...
-│   ├── infrastructure/          # Implementações
-│   │   ├── database/
-│   │   ├── cache/
-│   │   ├── messaging/
-│   │   └── integrations/
-│   ├── handler/                 # HTTP handlers
-│   │   ├── inbound.go
-│   │   ├── picking.go
-│   │   └── ...
-│   ├── middleware/              # HTTP middleware
-│   │   ├── auth.go
-│   │   ├── logging.go
-│   │   ├── error_handler.go
-│   │   └── rate_limit.go
-│   └── utils/                   # Helpers
-├── migrations/                  # SQL migrations (Flyway)
-├── tests/                       # Integration tests
-├── docker/                      # Docker files
-├── k8s/                        # Kubernetes manifests
-├── .github/workflows/           # CI/CD
-├── go.mod
-├── go.sum
+├── src/
+│   ├── WMS.API/                    # Web API Entry Point
+│   │   ├── Program.cs              # Entry point & configuration
+│   │   ├── appsettings.json
+│   │   ├── Controllers/            # API Controllers (ou Endpoints se Minimal API)
+│   │   ├── Middleware/             # HTTP middleware
+│   │   │   ├── AuthenticationMiddleware.cs
+│   │   │   ├── LoggingMiddleware.cs
+│   │   │   ├── ExceptionHandlerMiddleware.cs
+│   │   │   └── RateLimitingMiddleware.cs
+│   │   └── WMS.API.csproj
+│   │
+│   ├── WMS.Domain/                 # Domain Layer (Entities, Interfaces)
+│   │   ├── Entities/               # Domain models
+│   │   ├── Interfaces/             # Repository & Service interfaces
+│   │   ├── ValueObjects/           # Value objects
+│   │   ├── Events/                 # Domain events
+│   │   └── WMS.Domain.csproj
+│   │
+│   ├── WMS.Application/            # Application Layer (Use Cases)
+│   │   ├── UseCases/
+│   │   │   ├── Inbound/
+│   │   │   ├── Picking/
+│   │   │   ├── Shipping/
+│   │   │   └── ...
+│   │   ├── DTOs/                   # Data Transfer Objects
+│   │   ├── Mappings/               # AutoMapper profiles
+│   │   ├── Validators/             # FluentValidation
+│   │   └── WMS.Application.csproj
+│   │
+│   ├── WMS.Infrastructure/         # Infrastructure Layer
+│   │   ├── Persistence/            # Database implementation
+│   │   │   ├── ApplicationDbContext.cs
+│   │   │   ├── Repositories/
+│   │   │   └── Configurations/     # EF Core entity configurations
+│   │   ├── Caching/                # Redis implementation
+│   │   ├── Messaging/              # Kafka/RabbitMQ implementation
+│   │   ├── ExternalServices/       # Integrations
+│   │   └── WMS.Infrastructure.csproj
+│   │
+│   └── WMS.Shared/                 # Shared utilities
+│       ├── Extensions/
+│       ├── Helpers/
+│       └── WMS.Shared.csproj
+│
+├── tests/
+│   ├── WMS.UnitTests/
+│   ├── WMS.IntegrationTests/
+│   └── WMS.E2ETests/
+│
+├── docker/                         # Docker files
+├── k8s/                           # Kubernetes manifests
+├── .github/workflows/             # CI/CD
+├── migrations/                    # EF Core migrations ou SQL scripts
+├── WMS.sln                        # Solution file
 ├── Dockerfile
 ├── docker-compose.yml
-└── Makefile
+├── .editorconfig
+└── Directory.Build.props
 ```
 
 ### 2.2 Padrões de Design Aplicados
 
 #### Domain-Driven Design (DDD)
 
-```go
-// domain/models.go
-type OrderStatus string
+```csharp
+// WMS.Domain/Entities/Order.cs
+namespace WMS.Domain.Entities;
 
-const (
-    OrderStatusNew OrderStatus = "NEW"
-    OrderStatusPicked OrderStatus = "PICKED"
-    // ...
-)
+public class Order : BaseEntity
+{
+    public Guid Id { get; private set; }
+    public OrderNumber Number { get; private set; }
+    public OrderStatus Status { get; private set; }
+    public List<OrderLine> Lines { get; private set; } = new();
 
-type Order struct {
-    ID       OrderID
-    Number   OrderNumber
-    Status   OrderStatus
-    Lines    []OrderLine
-    // ...
-}
+    // Private constructor para forçar uso de Factory Method
+    private Order() { }
 
-// Value Objects para encapsular lógica
-type OrderNumber struct {
-    value string
-}
+    public static Order Create(OrderNumber number, Guid tenantId)
+    {
+        var order = new Order
+        {
+            Id = Guid.NewGuid(),
+            Number = number,
+            Status = OrderStatus.New,
+            TenantId = tenantId,
+            CreatedAt = DateTime.UtcNow
+        };
 
-func NewOrderNumber(val string) (OrderNumber, error) {
-    if len(val) == 0 {
-        return OrderNumber{}, errors.New("order number is required")
+        order.AddDomainEvent(new OrderCreatedEvent(order.Id));
+        return order;
     }
-    return OrderNumber{value: val}, nil
+
+    // Métodos de Domínio
+    public Result Pick(OrderLine line)
+    {
+        if (Status != OrderStatus.New)
+        {
+            return Result.Failure($"Cannot pick order with status {Status}");
+        }
+
+        Lines.Add(line);
+        Status = OrderStatus.Picked;
+        AddDomainEvent(new OrderPickedEvent(Id, line.Id));
+
+        return Result.Success();
+    }
 }
 
-// Métodos de Domínio
-func (o *Order) Pick(line OrderLine) error {
-    if o.Status != OrderStatusPicked {
-        return fmt.Errorf("cannot pick order with status %s", o.Status)
+// WMS.Domain/ValueObjects/OrderNumber.cs
+public record OrderNumber
+{
+    public string Value { get; }
+
+    private OrderNumber(string value) => Value = value;
+
+    public static Result<OrderNumber> Create(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return Result<OrderNumber>.Failure("Order number is required");
+        }
+
+        if (value.Length > 50)
+        {
+            return Result<OrderNumber>.Failure("Order number too long");
+        }
+
+        return Result<OrderNumber>.Success(new OrderNumber(value));
     }
-    // ...
+}
+
+// WMS.Domain/Enums/OrderStatus.cs
+public enum OrderStatus
+{
+    New,
+    Picked,
+    Packed,
+    Shipped,
+    Cancelled
 }
 ```
 
 #### Repository Pattern
 
-```go
-// domain/repositories.go
-type OrderRepository interface {
-    FindByID(ctx context.Context, id OrderID) (*Order, error)
-    Save(ctx context.Context, order *Order) error
-    FindByNumber(ctx context.Context, number OrderNumber) (*Order, error)
-    List(ctx context.Context, filter OrderFilter) ([]*Order, error)
+```csharp
+// WMS.Domain/Interfaces/IOrderRepository.cs
+namespace WMS.Domain.Interfaces;
+
+public interface IOrderRepository : IRepository<Order>
+{
+    Task<Order?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<Order?> GetByNumberAsync(OrderNumber number, CancellationToken cancellationToken = default);
+    Task<PagedResult<Order>> ListAsync(OrderFilter filter, CancellationToken cancellationToken = default);
+    Task AddAsync(Order order, CancellationToken cancellationToken = default);
+    Task UpdateAsync(Order order, CancellationToken cancellationToken = default);
+    Task DeleteAsync(Order order, CancellationToken cancellationToken = default);
 }
 
-// infrastructure/persistence/order_repository.go
-type postgresOrderRepository struct {
-    db *sql.DB
-}
+// WMS.Infrastructure/Persistence/Repositories/OrderRepository.cs
+namespace WMS.Infrastructure.Persistence.Repositories;
 
-func (r *postgresOrderRepository) FindByID(ctx context.Context, id OrderID) (*Order, error) {
-    // Query implementation
+public class OrderRepository : IOrderRepository
+{
+    private readonly ApplicationDbContext _context;
+
+    public OrderRepository(ApplicationDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<Order?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        return await _context.Orders
+            .Include(o => o.Lines)
+            .FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
+    }
+
+    public async Task<Order?> GetByNumberAsync(OrderNumber number, CancellationToken cancellationToken = default)
+    {
+        return await _context.Orders
+            .Include(o => o.Lines)
+            .FirstOrDefaultAsync(o => o.Number == number, cancellationToken);
+    }
+
+    public async Task AddAsync(Order order, CancellationToken cancellationToken = default)
+    {
+        await _context.Orders.AddAsync(order, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
 }
 ```
 
 #### Service Layer
 
-```go
-// domain/services.go
-type PickingService interface {
-    CreatePickingOrder(ctx context.Context, cmd CreatePickingOrderCommand) (*PickingOrder, error)
-    CompletePickingOrder(ctx context.Context, cmd CompletePickingOrderCommand) error
+```csharp
+// WMS.Application/UseCases/Picking/IPickingService.cs
+namespace WMS.Application.UseCases.Picking;
+
+public interface IPickingService
+{
+    Task<Result<PickingOrder>> CreatePickingOrderAsync(
+        CreatePickingOrderCommand command,
+        CancellationToken cancellationToken = default);
+
+    Task<Result> CompletePickingOrderAsync(
+        CompletePickingOrderCommand command,
+        CancellationToken cancellationToken = default);
 }
 
-// application/picking/service.go
-type pickingService struct {
-    orderRepo OrderRepository
-    pickingRepo PickingOrderRepository
-    eventPublisher EventPublisher
-}
+// WMS.Application/UseCases/Picking/PickingService.cs
+public class PickingService : IPickingService
+{
+    private readonly IOrderRepository _orderRepository;
+    private readonly IPickingOrderRepository _pickingRepository;
+    private readonly IEventPublisher _eventPublisher;
+    private readonly ILogger<PickingService> _logger;
 
-func (s *pickingService) CreatePickingOrder(
-    ctx context.Context, 
-    cmd CreatePickingOrderCommand,
-) (*PickingOrder, error) {
-    // Validação
-    order, err := s.orderRepo.FindByID(ctx, cmd.OrderID)
-    if err != nil {
-        return nil, fmt.Errorf("order not found: %w", err)
+    public PickingService(
+        IOrderRepository orderRepository,
+        IPickingOrderRepository pickingRepository,
+        IEventPublisher eventPublisher,
+        ILogger<PickingService> logger)
+    {
+        _orderRepository = orderRepository;
+        _pickingRepository = pickingRepository;
+        _eventPublisher = eventPublisher;
+        _logger = logger;
     }
-    
-    // Lógica de negócio
-    pickingOrder := NewPickingOrder(order, cmd)
-    
-    // Persistência
-    if err := s.pickingRepo.Save(ctx, pickingOrder); err != nil {
-        return nil, fmt.Errorf("failed to save picking order: %w", err)
+
+    public async Task<Result<PickingOrder>> CreatePickingOrderAsync(
+        CreatePickingOrderCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Validação
+            var order = await _orderRepository.GetByIdAsync(command.OrderId, cancellationToken);
+            if (order == null)
+            {
+                return Result<PickingOrder>.Failure($"Order not found: {command.OrderId}");
+            }
+
+            // Lógica de negócio
+            var pickingOrder = PickingOrder.Create(order, command);
+            if (pickingOrder.IsFailure)
+            {
+                return Result<PickingOrder>.Failure(pickingOrder.Error);
+            }
+
+            // Persistência
+            await _pickingRepository.AddAsync(pickingOrder.Value, cancellationToken);
+
+            // Publicar eventos de domínio
+            foreach (var domainEvent in pickingOrder.Value.DomainEvents)
+            {
+                await _eventPublisher.PublishAsync(domainEvent, cancellationToken);
+            }
+
+            _logger.LogInformation("Picking order {PickingOrderId} created for order {OrderId}",
+                pickingOrder.Value.Id, command.OrderId);
+
+            return Result<PickingOrder>.Success(pickingOrder.Value);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating picking order for order {OrderId}", command.OrderId);
+            return Result<PickingOrder>.Failure($"Failed to create picking order: {ex.Message}");
+        }
     }
-    
-    // Publicar evento
-    s.eventPublisher.Publish(ctx, pickingOrder.DomainEvents()...)
-    
-    return pickingOrder, nil
 }
 ```
 
